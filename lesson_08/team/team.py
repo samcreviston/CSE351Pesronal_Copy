@@ -66,20 +66,84 @@ Suggestions and team Discussion:
   philosophers[i] needs forks[i] and forks[i+1] to eat (the % operator helps).
 """
 
+import random
 import time
 import threading
 
 PHILOSOPHERS = 5
 MAX_MEALS_EATEN = PHILOSOPHERS * 5 # NOTE: Total meals to be eaten, not per philosopher!
 
+# possible race condition - need to lock
+meals = 0
+meal_counts = [0] * PHILOSOPHERS
+
 # TODO - Create the Waiter class.
+class Waiter:
+  def __init__(self, ):
+    self.lock = threading.Lock()   # thread safe
+    self.forks = [False] * PHILOSOPHERS
+    # TODO - Add any variables you need to the Waiter class.
+  def ask_to_eat(self, id):
+    # TODO - Implement this method to return True if the philosopher can eat, False otherwise.
+    with self.lock:
+      if not self.forks[id] and not self.forks[(id + 1) % PHILOSOPHERS]:
+        self.forks[id] = True
+        self.forks[(id + 1) % PHILOSOPHERS] = True
+        return True
+      else:
+        return False
+      
+  def finished_eating(self, id):
+    # TODO - Implement this method to update the Waiter state to indicate that the philosopher is finished eating.
+    with self.lock:
+      self.forks[id] = False
+      self.forks[(id + 1) % PHILOSOPHERS] = False
+
+     
+     
+class Philosopher(threading.Thread):
+  def __init__(self, id, lock_meals, left, right):
+    threading.Thread.__init__(self)
+    self.id = id
+    self.left = left
+    self.right = right
+    self.lock_meals = lock_meals
+
+  def run(self):
+    global meal_count
+    global meals
+    done = False
+    while not done:
+      with self.lock_meals:
+        if meals >= MAX_MEALS_EATEN:
+          done = True
+          continue
+
+    # try to eat
+
+  def dining(self):
+    print ("Philosopher", self.id, " starts to eat.")
+    time.sleep(random.uniform(1, 3))
+    print ("Philosopher", self.id, " finishes eating and leaves to think.")
+
+  def thinking(self):
+    time.sleep(random.uniform(1, 3))
+
 
 def main():
-    # TODO - Get an instance of the Waiter.
-    # TODO - Create the forks???
-    # TODO - Create PHILOSOPHERS philosophers.
-    # TODO - Start them eating and thinking.
-    # TODO - Display how many times each philosopher ate.
+  # TODO - Get an instance of the Waiter.
+    waiter = Waiter()
+
+  # TODO - Create a lock for the meal count and meals list.
+  # TODO - Create the forks???
+  forks = [threading.Lock() for _ in range(PHILOSOPHERS)]
+  # TODO - Create PHILOSOPHERS philosophers.
+  philosophers = [Philosopher(i, lock_meals, forks[i % PHILOSOPHERS], forks[(i + 1) % PHILOSOPHERS]) for i in range(PHILOSOPHERS)]
+
+  # TODO - Start them eating and thinking.
+  Waiter.start()
+  for philosopher in philosophers:
+  # TODO - Display how many times each philosopher ate.
     pass
 
 
