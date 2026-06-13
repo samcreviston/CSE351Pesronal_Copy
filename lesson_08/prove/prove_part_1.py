@@ -28,16 +28,58 @@ SLOW_SPEED = 100
 FAST_SPEED = 1
 speed = SLOW_SPEED
 
-# TODO: Add any functions needed here.
+
+def _enable_auto_advance():
+    """Make cv2.waitKey non-blocking so each maze proceeds automatically."""
+    if getattr(_enable_auto_advance, "_patched", False):
+        return
+
+    original_wait_key = cv2.waitKey
+
+    def non_blocking_wait_key(_delay):
+        return original_wait_key(1)
+
+    cv2.waitKey = non_blocking_wait_key
+    _enable_auto_advance._patched = True
 
 def solve_path(maze):
     """ Solve the maze and return the path found between the start and end positions.  
         The path is a list of positions, (x, y) """
+    _enable_auto_advance()
     path = []
-    # TODO: Solve the maze recursively while tracking the correct path.
 
-    # Hint: You can create an inner function to do the recursion
+    def recurse(row, col):
+        # Base case: reached the exit
+        if maze.at_end(row, col):
+            path.append((row, col))
+            return True
 
+        # Mark current cell as part of current exploration
+        maze.move(row, col, COLOR)
+
+        # Prefer right/down before up/left when exploring neighbors
+        possible_moves = maze.get_possible_moves(row, col)
+        priority = {
+            (0, 1): 0,   # right
+            (1, 0): 1,   # down
+            (-1, 0): 2,  # up
+            (0, -1): 3   # left
+        }
+        possible_moves.sort(key=lambda move: priority.get((move[0] - row, move[1] - col), 99))
+
+        for next_row, next_col in possible_moves:
+            if recurse(next_row, next_col):
+                # On the way back up, add this position to the correct path
+                path.append((row, col))
+                return True
+
+        # Dead end — restore cell to grey and backtrack
+        maze.restore(row, col)
+        return False
+
+    start_row, start_col = maze.get_start_pos()
+    recurse(start_row, start_col)
+    path.reverse()   # path was built end-to-start; flip it
     return path
 
 

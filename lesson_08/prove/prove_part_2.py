@@ -21,11 +21,11 @@ position:
 
 What would be your strategy?
 
-<Answer here>
+to retrace the connection of threads that led to the end position by starting form the end.
 
 Why would it work?
 
-<Answer here>
+As long as each thread is aware of it's parent thread, it would work because it can follow the chain of parent threads back to the start.
 
 """
 
@@ -67,6 +67,10 @@ current_color_index = 0
 thread_count = 0
 stop = False
 speed = SLOW_SPEED
+stop_lock = threading.Lock()
+color_lock = threading.Lock()
+count_lock = threading.Lock()
+move_lock = threading.Lock()
 
 def get_color():
     """ Returns a different color when called """
@@ -79,13 +83,107 @@ def get_color():
 
 
 # TODO: Add any function(s) you need, if any, here.
+def _should_stop():
+    """Read the shared stop flag safely."""
+    with stop_lock:
+        return stop
+
+
+def _set_stop():
+    """Set the shared stop flag safely."""
+    global stop
+    with stop_lock:
+        stop = True
+
+
+def _next_color():
+    """Get a thread color safely."""
+    with color_lock:
+        return get_color()
+
+
+def _increment_thread_count():
+    """Count a newly created thread safely."""
+    global thread_count
+    with count_lock:
+        thread_count += 1
+
+
+def _try_move(maze, row, col, color):
+    """Atomically check and move to avoid races between threads."""
+    with move_lock:
+        if not maze.can_move_here(row, col):
+            return False
+        maze.move(row, col, color)
+        return True
+
+
+def _search_branch(maze, row, col, color):
+    """Recursively search from one branch of the maze."""
+    if _should_stop():
+        return
+
+    if not _try_move(maze, row, col, color):
+        return
+
+    if maze.at_end(row, col):
+        _set_stop()
+        return
+
+    if _should_stop():
+        return
+
+    moves = maze.get_possible_moves(row, col)
+    if len(moves) == 0:
+        return
+
+    # Keep one path in this thread; split the rest into new threads.
+    threads = []
+    for next_row, next_col in moves[1:]:
+        if _should_stop():
+            break
+        child_color = _next_color()
+        child = threading.Thread(target=_search_branch, args=(maze, next_row, next_col, child_color))
+        _increment_thread_count()
+        child.start()
+        threads.append(child)
+
+    first_row, first_col = moves[0]
+    _search_branch(maze, first_row, first_col, color)
+
+    for child in threads:
+        child.join()
+
+
+def _enable_auto_advance():
+    """Make cv2.waitKey non-blocking so each maze proceeds automatically."""
+    if getattr(_enable_auto_advance, "_patched", False):
+        return
+
+    original_wait_key = cv2.waitKey
+
+    def non_blocking_wait_key(_delay):
+        return original_wait_key(1)
+
+    cv2.waitKey = non_blocking_wait_key
+    _enable_auto_advance._patched = True
 
 
 def solve_find_end(maze):
     """ Finds the end position using threads. Nothing is returned. """
     # When one of the threads finds the end position, stop all of them.
     global stop
+    global thread_count
+    global current_color_index
+    _enable_auto_advance()
     stop = False
+
+    thread_count = 1
+    current_color_index = 0
+
+    start_row, start_col = maze.get_start_pos()
+    start_color = _next_color()
+    _search_branch(maze, start_row, start_col, start_color)
 
 
 
