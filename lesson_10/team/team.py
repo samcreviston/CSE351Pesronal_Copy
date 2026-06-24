@@ -13,12 +13,16 @@ Instructions:
   not to touch.
 """
 
+import math
 import time
 import random
 import threading
 import multiprocessing as mp
+from concurrent.futures import ThreadPoolExecutor
 
 from cse351 import *
+
+THREADPOOLCOOUNT = 12
 
 def merge_sort(arr):
     """
@@ -86,9 +90,13 @@ def merge_normal(arr):
 
 
 def merge_sort_thread(arr):
-    # TODO - Add your code here to use threads.
-    #        You need to create a thread to handle that call
-    pass
+    # Use a depth limit to avoid submitting more recursive tasks than the pool
+    # can service, which would cause a deadlock.  At depth d there are 2^d
+    # in-flight tasks; we stop spawning new threads once 2^d >= THREADPOOLCOOUNT.
+    max_depth = int(math.log2(THREADPOOLCOOUNT))
+    lock = threading.Lock()
+    with ThreadPoolExecutor(max_workers=THREADPOOLCOOUNT) as executor:
+        _merge_sort_threaded(arr, executor, lock, max_depth)
 
 
 def merge_sort_process(arr):
@@ -97,7 +105,49 @@ def merge_sort_process(arr):
     pass
 
 
-# TODO - Add any function(s) here if needed.
+def _merge_sort_threaded(arr, executor, lock, max_depth, depth=0):
+    """Recursive helper for merge_sort_thread."""
+    if len(arr) > 1:
+
+        mid = len(arr) // 2
+        L = arr[:mid]
+        R = arr[mid:]
+
+        if depth < max_depth:
+            # Submit both halves to the thread pool so they run concurrently.
+            f1 = executor.submit(_merge_sort_threaded, L, executor, threading.Lock(), max_depth, depth + 1)
+            f2 = executor.submit(_merge_sort_threaded, R, executor, threading.Lock(), max_depth, depth + 1)
+            f1.result()
+            f2.result()
+        else:
+            # Past the depth limit — sort sequentially to avoid pool exhaustion.
+            merge_sort(L)
+            merge_sort(R)
+
+        i = j = k = 0
+
+        while i < len(L) and j < len(R):
+            if L[i] < R[j]:
+                with lock:
+                    arr[k] = L[i]
+                i += 1
+            else:
+                with lock:
+                    arr[k] = R[j]
+                j += 1
+            k += 1
+
+        while i < len(L):
+            with lock:
+                arr[k] = L[i]
+            i += 1
+            k += 1
+
+        while j < len(R):
+            with lock:
+                arr[k] = R[j]
+            j += 1
+            k += 1
 
 
 def main():
