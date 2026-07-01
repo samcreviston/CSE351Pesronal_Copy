@@ -76,11 +76,20 @@ class Program
         var film6 = await GetDataFromServerAsync($"{TopApiUrl}/films/6");
         Console.WriteLine(film6["director"]);
 
-        await GetUrlsAsync(film6, "characters");
-        await GetUrlsAsync(film6, "planets");
-        await GetUrlsAsync(film6, "starships");
-        await GetUrlsAsync(film6, "vehicles");
-        await GetUrlsAsync(film6, "species");
+        //iterate threough the different url kinds in a loop starting them as tasks
+        var kinds = new[] { "characters", "planets", "starships", "vehicles", "species" };
+        var tasks = kinds.Select(kind => GetUrlsAsync(film6, kind)).ToList();
+        await Task.WhenAll(tasks);
+
+
+
+
+
+        // await GetUrlsAsync(film6, "characters");
+        // await GetUrlsAsync(film6, "planets");
+        // await GetUrlsAsync(film6, "starships");
+        // await GetUrlsAsync(film6, "vehicles");
+        // await GetUrlsAsync(film6, "species");
 
         stopwatch.Stop();
 
