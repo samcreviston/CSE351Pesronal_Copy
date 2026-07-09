@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.Collections.Concurrent;
 
 namespace assignment11;
 
@@ -22,6 +23,14 @@ public class Assignment11
 
     public static void Main(string[] args)
     {
+        const int NUM_THREADS = 10;
+
+        // Step 1 - bounded queue (backpressure: blocks producer when full)
+        var queue = new BlockingCollection<long>(NUM_THREADS * 100);
+
+        // Step 2 - thread-safe bag to collect primes, sorted at the end
+        var primes = new ConcurrentBag<long>(); 
+
         // Use local variables for counting since we are in a single thread.
         int numbersProcessed = 0;
         int primeCount = 0;
@@ -30,18 +39,36 @@ public class Assignment11
 
         var stopwatch = Stopwatch.StartNew();
         
-        // A single for-loop to check every number sequentially.
-        for (long i = START_NUMBER; i < START_NUMBER + RANGE_COUNT; i++)
+        Thread[] workers = new Thread[NUM_THREADS];
+        for (int t = 0; t < NUM_THREADS; t++)
         {
-            numbersProcessed++;
-            if (IsPrime(i))
+            workers[t] = new Thread(() =>
             {
-                primeCount++;
-                Console.Write($"{i}, ");
-            }
+                foreach(var num in queue.GetConsumingEnumerable())
+                    if (IsPrime(num))
+                    {
+                        primes.Add(num);
+                        Interlocked.Increment(ref primeCount);
+                    }
+            });
+            workers[t].Start();
         }
 
+        for(long i = START_NUMBER; i < START_NUMBER + RANGE_COUNT; i++)
+            queue.Add(i);
+
+        queue.CompleteAdding();
+
+        foreach (var worker in workers)
+            worker.Join();
+
         stopwatch.Stop();
+
+        var sortedPrimes = primes.ToList();
+        sortedPrimes.Sort();
+
+        foreach (var p in sortedPrimes)
+            Console.Write($"{p}, ");
 
         Console.WriteLine(); // New line after all primes are printed
         Console.WriteLine();

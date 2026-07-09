@@ -47,7 +47,7 @@ class Program
     
     static async Task Main()
     {
-        string logLocation = Environment.CurrentDirectory[ ..(Environment.CurrentDirectory.LastIndexOf("Assignment14", StringComparison.Ordinal) + 13)];
+        string logLocation = Environment.CurrentDirectory[ ..(Environment.CurrentDirectory.LastIndexOf("Assignment14", StringComparison.Ordinal) + 12)];
         Logger.Configure(minimumLevel: LogLevel.Debug, logToFile: true, filePath: $"{logLocation}assignment.log");
         
         var data = await Solve.GetDataFromServerAsync($"{Solve.TopApiUrl}");
